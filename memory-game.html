@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Accessible Memory Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- =======================
+       GLOBAL STYLES
+       ======================= -->
+  <style>
+    /* CSS Reset (minimal) */
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    /* Main game container */
+    .game {
+      width: 100%;
+      max-width: 420px;
+      padding: 1rem;
+      background: #020617;
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+
+    /* =======================
+       SCORE PANEL
+       ======================= */
+    .stats {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+      font-size: 0.9rem;
+    }
+
+    .stars {
+      color: gold;
+    }
+
+    /* =======================
+       GAME GRID
+       ======================= */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+    }
+
+    /* Individual card */
+    .card {
+      position: relative;
+      width: 100%;
+      padding-top: 100%; /* Perfect square */
+      perspective: 1000px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    /* Card inner wrapper for flip animation */
+    .card-inner {
+      position: absolute;
+      inset: 0;
+      transition: transform 0.6s;
+      transform-style: preserve-3d;
+    }
+
+    /* Flipped state */
+    .card.flipped .card-inner {
+      transform: rotateY(180deg);
+    }
+
+    /* Card faces */
+    .card-front,
+    .card-back {
+      position: absolute;
+      inset: 0;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      backface-visibility: hidden;
+    }
+
+    .card-front {
+      background: #1e293b;
+    }
+
+    .card-back {
+      background: #38bdf8;
+      color: #020617;
+      transform: rotateY(180deg);
+    }
+
+    /* =======================
+       MODAL
+       ======================= */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #020617;
+      padding: 2rem;
+      border-radius: 12px;
+      text-align: center;
+      max-width: 320px;
+      width: 90%;
+    }
+
+    button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      border: none;
+      background: #38bdf8;
+      color: #020617;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    button:focus {
+      outline: 3px solid #facc15;
+    }
+
+    /* =======================
+       CONFETTI
+       ======================= */
+    .confetti {
+      position: fixed;
+      width: 6px;
+      height: 10px;
+      background: hsl(var(--hue), 80%, 60%);
+      top: -10px;
+      animation: fall 3s linear forwards;
+    }
+
+    @keyframes fall {
+      to {
+        transform: translateY(110vh) rotate(720deg);
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =======================
+       GAME UI
+       ======================= -->
+  <main class="game" aria-label="Memory game">
+    <h1>Memory Game</h1>
+
+    <!-- Stats bar -->
+    <div class="stats" aria-live="polite">
+      <div>⏱ <span id="timer">0</span>s</div>
+      <div>Moves: <span id="moves">0</span></div>
+      <div class="stars" id="stars">★★★</div>
+    </div>
+
+    <!-- Game grid -->
+    <div
+      class="grid"
+      id="grid"
+      role="grid"
+      aria-label="Memory cards grid"
+    ></div>
+
+    <p style="font-size:0.75rem; opacity:0.8; margin-top:0.75rem;">
+      Use arrow keys to navigate, Enter to flip a card.
+    </p>
+  </main>
+
+  <!-- =======================
+       WIN MODAL
+       ======================= -->
+  <div class="modal" id="modal" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <h2>🎉 You Win!</h2>
+      <p id="summary"></p>
+      <p id="best"></p>
+      <button onclick="restart()">Play Again</button>
+    </div>
+  </div>
+
+  <!-- =======================
+       GAME LOGIC
+       ======================= -->
+  <script>
+    /* -----------------------
+       GAME STATE
+       ----------------------- */
+    const symbols = ['🍎','🍌','🍒','🍇','🍉','🍍','🥝','🍑'];
+    let cards = [];
+    let flipped = [];
+    let matched = 0;
+    let moves = 0;
+    let seconds = 0;
+    let timerInterval = null;
+    let focusedIndex = 0;
+
+    const grid = document.getElementById('grid');
+    const movesEl = document.getElementById('moves');
+    const timerEl = document.getElementById('timer');
+    const starsEl = document.getElementById('stars');
+
+    /* -----------------------
+       INITIALIZATION
+       ----------------------- */
+    function init() {
+      // Reset state
+      cards = [...symbols, ...symbols].sort(() => Math.random() - 0.5);
+      flipped = [];
+      matched = 0;
+      moves = 0;
+      seconds = 0;
+      focusedIndex = 0;
+      clearInterval(timerInterval);
+
+      movesEl.textContent = '0';
+      timerEl.textContent = '0';
+      starsEl.textContent = '★★★';
+
+      grid.innerHTML = '';
+
+      // Create cards
+      cards.forEach((symbol, index) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.tabIndex = index === 0 ? 0 : -1;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', 'Hidden card');
+        card.dataset.symbol = symbol;
+        card.dataset.index = index;
+
+        card.innerHTML = `
+          <div class="card-inner">
+            <div class="card-front"></div>
+            <div class="card-back">${symbol}</div>
+          </div>
+        `;
+
+        card.addEventListener('click', () => flip(card));
+        grid.appendChild(card);
+      });
+    }
+
+    /* -----------------------
+       TIMER
+       ----------------------- */
+    function startTimer() {
+      if (timerInterval) return;
+      timerInterval = setInterval(() => {
+        seconds++;
+        timerEl.textContent = seconds;
+      }, 1000);
+    }
+
+    /* -----------------------
+       CARD FLIP LOGIC
+       ----------------------- */
+    function flip(card) {
+      if (
+        card.classList.contains('flipped') ||
+        flipped.length === 2
+      ) return;
+
+      startTimer();
+
+      card.classList.add('flipped');
+      card.setAttribute('aria-label', 'Revealed card');
+      flipped.push(card);
+
+      if (flipped.length === 2) {
+        moves++;
+        movesEl.textContent = moves;
+        updateStars();
+
+        const [a, b] = flipped;
+
+        if (a.dataset.symbol === b.dataset.symbol) {
+          matched += 2;
+          flipped = [];
+          if (matched === cards.length) win();
+        } else {
+          setTimeout(() => {
+            a.classList.remove('flipped');
+            b.classList.remove('flipped');
+            a.setAttribute('aria-label', 'Hidden card');
+            b.setAttribute('aria-label', 'Hidden card');
+            flipped = [];
+          }, 800);
+        }
+      }
+    }
+
+    /* -----------------------
+       STAR RATING
+       ----------------------- */
+    function updateStars() {
+      if (moves > 20) starsEl.textContent = '★★☆';
+      if (moves > 30) starsEl.textContent = '★☆☆';
+    }
+
+    /* -----------------------
+       WIN CONDITION
+       ----------------------- */
+    function win() {
+      clearInterval(timerInterval);
+
+      // Store best score
+      const best = JSON.parse(localStorage.getItem('bestScore') || 'null');
+      const current = { moves, seconds };
+
+      if (!best || seconds < best.seconds) {
+        localStorage.setItem('bestScore', JSON.stringify(current));
+      }
+
+      document.getElementById('summary').textContent =
+        `Time: ${seconds}s, Moves: ${moves}`;
+
+      document.getElementById('best').textContent =
+        localStorage.getItem('bestScore')
+          ? `Best Time: ${JSON.parse(localStorage.getItem('bestScore')).seconds}s`
+          : '';
+
+      document.getElementById('modal').classList.add('show');
+      confetti();
+    }
+
+    /* -----------------------
+       CONFETTI EFFECT
+       ----------------------- */
+    function confetti() {
+      for (let i = 0; i < 80; i++) {
+        const c = document.createElement('div');
+        c.className = 'confetti';
+        c.style.left = Math.random() * 100 + 'vw';
+        c.style.setProperty('--hue', Math.random() * 360);
+        c.style.animationDelay = Math.random() + 's';
+        document.body.appendChild(c);
+        setTimeout(() => c.remove(), 3000);
+      }
+    }
+
+    /* -----------------------
+       KEYBOARD CONTROLS
+       ----------------------- */
+    document.addEventListener('keydown', (e) => {
+      const cardsEls = [...document.querySelectorAll('.card')];
+
+      if (['ArrowRight','ArrowLeft','ArrowUp','ArrowDown'].includes(e.key)) {
+        e.preventDefault();
+      }
+
+      switch (e.key) {
+        case 'ArrowRight':
+          focusedIndex = (focusedIndex + 1) % cardsEls.length;
+          break;
+        case 'ArrowLeft':
+          focusedIndex = (focusedIndex - 1 + cardsEls.length) % cardsEls.length;
+          break;
+        case 'ArrowDown':
+          focusedIndex = (focusedIndex + 4) % cardsEls.length;
+          break;
+        case 'ArrowUp':
+          focusedIndex = (focusedIndex - 4 + cardsEls.length) % cardsEls.length;
+          break;
+        case 'Enter':
+          flip(cardsEls[focusedIndex]);
+          return;
+        default:
+          return;
+      }
+
+      cardsEls.forEach(c => c.tabIndex = -1);
+      cardsEls[focusedIndex].tabIndex = 0;
+      cardsEls[focusedIndex].focus();
+    });
+
+    /* -----------------------
+       RESTART
+       ----------------------- */
+    function restart() {
+      document.getElementById('modal').classList.remove('show');
+      init();
+    }
+
+    // Start game
+    init();
+  </script>
+</body>
+</html>
