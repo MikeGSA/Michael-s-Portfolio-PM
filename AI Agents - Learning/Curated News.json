@@ -1,0 +1,148 @@
+{
+  "name": "Curated News",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "availableInChat": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -384,
+        -16
+      ],
+      "id": "3db6fcad-b722-44e0-bca0-35663b2e24fc",
+      "name": "When chat message received",
+      "webhookId": "55e5562a-3c9b-49ec-93f6-59aaff2ecae3"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a professional stock market analyst. Analyze the stock ticker symbol: {{ $json.chatInput }}\n\nProvide a concise analysis in the following format:\n\n**Stock: [TICKER SYMBOL]**\n**Current Context:** [Brief 1-2 sentence market context]\n\n**Technical Analysis:**\n- Price trend (bullish/bearish/sideways)\n- Key support and resistance levels\n- Moving average signals\n- Volume analysis\n\n**Fundamental Highlights:**\n- Recent earnings/revenue trends\n- Key financial metrics (P/E, debt ratios)\n- Industry position and competitive advantages\n- Recent news impact\n\n**Recommendation:**\n- **Action:** BUY / HOLD / SELL\n- **Confidence Level:** High/Medium/Low\n- **Price Target:** [If applicable]\n- **Stop Loss:** [If applicable]\n- **Time Horizon:** Short-term (1-3 months) / Medium-term (3-12 months)\n\n**Key Risks:**\n- [List 2-3 main risks to watch]\n\n**Rationale:**\n[2-3 sentences explaining the recommendation]\n\nKeep the analysis under 300 words total. Focus on actionable insights for retail investors.\n\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -176,
+        -16
+      ],
+      "id": "56297ce6-5fb0-4672-a2cd-4025653a825e",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        192
+      ],
+      "id": "b0b7420f-16c2-4444-8d34-884caeac3443",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "uQZooaRhJMrVLEzv",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -176,
+        192
+      ],
+      "id": "3796a9b9-af36-4105-8d95-bb4387232720",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "sendTo": "careersmikeg@gmail.com",
+        "subject": "=Stock analysis {{ $('When chat message received').item.json.chatInput }}",
+        "message": "={{ $json.output }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        176,
+        -16
+      ],
+      "id": "164b3a24-f3c5-46f9-8d97-57c8fe208ace",
+      "name": "Send a message",
+      "webhookId": "1f344c48-0447-4320-9bd3-7419a5c5a807",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UNJ6vIflAqeOioIa",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "86b4afd5-cd30-4cd3-9065-c027a9de6287",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e61798d95b2ce727c74f9d9f3c14364de823c25519d91fa844229a80ae1380cb"
+  },
+  "id": "bCmCQTsULmbZN978T7rHT",
+  "tags": []
+}
